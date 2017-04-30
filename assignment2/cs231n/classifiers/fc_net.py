@@ -188,6 +188,10 @@ class FullyConnectedNet(object):
             self.params['b'+str(i)] = np.zeros(hidden_dims[i-1])
             input_dim = hidden_dims[i-1]
             
+            if self.use_batchnorm:
+                self.params['gamma'+str(i)] = np.ones(hidden_dims[i-1])
+                self.params['beta'+str(i)] = np.zeros(hidden_dims[i-1])
+            
         self.params['W'+str(self.num_layers)] = weight_scale * np.random.randn(input_dim, num_classes)
         self.params['b'+str(self.num_layers)] = np.zeros(num_classes)
         ############################################################################
@@ -253,11 +257,25 @@ class FullyConnectedNet(object):
             W = self.params['W'+str(i)]
             b = self.params['b'+str(i)]
             
+            current_caches = {}
+            
             if i != (self.num_layers):
-                out, cache_h = affine_relu_forward(out, W, b)
+                out, cache_affine = affine_forward(out, W, b)
+                current_caches['affine'] = cache_affine
+                if self.use_batchnorm:
+                    gamma = self.params['gamma'+str(i)]
+                    beta = self.params['beta'+str(i)]
+                    bn_params = self.bn_params[i-1]
+                    
+                    out, cache_bn = batchnorm_forward(out, gamma, beta, bn_params)
+                    current_caches['bn'] = cache_bn
+                
+                out, cache_relu = relu_forward(out)
+                current_caches['relu'] = cache_relu
             else:
-                out, cache_h = affine_forward(out, W, b)
-            caches.append(cache_h)
+                out, cache_affine = affine_forward(out, W, b)
+                current_caches['affine'] = cache_affine
+            caches.append(current_caches)
         
         scores = out
         ############################################################################
@@ -289,9 +307,18 @@ class FullyConnectedNet(object):
             loss += 0.5*self.reg*np.sum(W*W)
             
             if i == (self.num_layers):
-                dx, dW, db = affine_backward(dx, caches[i-1])
+                cache = caches[i-1]['affine']
+                dx, dW, db = affine_backward(dx, cache)
             else:
-                dx, dW, db = affine_relu_backward(dx, caches[i-1])
+                cache = caches[i-1]
+                dx = relu_backward(dx, cache['relu'])
+                
+                if self.use_batchnorm:
+                    dx, dgamma, dbeta = batchnorm_backward(dx, cache['bn'])
+                    grads['gamma'+str(i)] = dgamma
+                    grads['beta'+str(i)] = dbeta
+                    
+                dx, dW, db = affine_backward(dx, cache['affine'])
 
             grads['W'+str(i)] = dW + self.reg * W
             grads['b'+str(i)] = db

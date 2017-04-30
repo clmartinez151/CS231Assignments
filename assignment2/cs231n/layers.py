@@ -244,9 +244,27 @@ def batchnorm_backward(dout, cache):
     ###########################################################################
     x, sample_mean, sample_var, x_norm, gamma, beta, eps = cache
     
-    dout += gamma
-    dgamma = 0.5*sample_var**(-0.5)
-    dbeta = #this is most likely wrong
+    N = dout.shape[0]
+    
+    dbeta = 1*np.sum(dout, axis=0) #got gradient for first learnable parameter
+    dgammax = 1*dout
+    
+    dgamma = np.sum(dgammax*x_norm, axis=0) #got gradient for second learnable parameter
+    dx_norm = dgammax*gamma
+    
+    dx_numerator = (1/np.sqrt(sample_var))*dx_norm
+    dx_denominator = np.sum((x-sample_mean)*dx_norm, axis=0)
+    
+    dx_denominator = dx_denominator*(-1/(np.sqrt(sample_var)**2))
+    dx_denominator = dx_denominator*(0.5/np.sqrt(sample_var))
+    dx_denominator = dx_denominator*((1/N)*np.ones(dout.shape))
+    dx_denominator = dx_denominator*(2*(x-sample_mean))
+    
+    dx = 1*(dx_numerator + dx_denominator)
+    dx_temp = -1 * np.sum(dx, axis=0)
+    
+    #got gradient for last learnable parameter
+    dx = (1/N)* np.ones(dout.shape) * dx_temp + dx
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
