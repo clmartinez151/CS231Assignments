@@ -262,16 +262,20 @@ class FullyConnectedNet(object):
             if i != (self.num_layers):
                 out, cache_affine = affine_forward(out, W, b)
                 current_caches['affine'] = cache_affine
+                
                 if self.use_batchnorm:
                     gamma = self.params['gamma'+str(i)]
                     beta = self.params['beta'+str(i)]
                     bn_params = self.bn_params[i-1]
-                    
                     out, cache_bn = batchnorm_forward(out, gamma, beta, bn_params)
                     current_caches['bn'] = cache_bn
                 
                 out, cache_relu = relu_forward(out)
                 current_caches['relu'] = cache_relu
+                
+                if self.use_dropout:
+                    out, cache_dropout = dropout_forward(out, self.dropout_param)
+                    current_caches['dropout'] = cache_dropout
             else:
                 out, cache_affine = affine_forward(out, W, b)
                 current_caches['affine'] = cache_affine
@@ -311,6 +315,10 @@ class FullyConnectedNet(object):
                 dx, dW, db = affine_backward(dx, cache)
             else:
                 cache = caches[i-1]
+                
+                if self.use_dropout:
+                    dx = dropout_backward(dx, cache['dropout'])
+                
                 dx = relu_backward(dx, cache['relu'])
                 
                 if self.use_batchnorm:
